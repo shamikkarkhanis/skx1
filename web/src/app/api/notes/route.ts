@@ -7,6 +7,21 @@ export const runtime = 'nodejs';
 
 const emptyDoc = { type: 'doc', content: [{ type: 'paragraph' }] };
 
+// GET /api/notes -> list notes (no auth yet, returns all)
+export async function GET() {
+  try {
+    const rows = db
+      .select({ id: notes.id, title: notes.title, createdAt: notes.createdAt, updatedAt: notes.updatedAt })
+      .from(notes)
+      .all();
+    rows.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
+    return NextResponse.json(rows);
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ error: 'Failed to list notes' }, { status: 500 });
+  }
+}
+
 export async function POST() {
   try {
     const id = randomUUID();

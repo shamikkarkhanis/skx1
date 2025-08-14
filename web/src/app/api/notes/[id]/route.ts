@@ -22,12 +22,34 @@ function safeParseJSON(input: string | null | undefined) {
   }
 }
 
+
+// Resolve `id` defensively: prefer awaited context.params, fall back to URL parsing
+async function resolveId(
+  req: Request,
+  context: { params?: Promise<{ id?: string }> | { id?: string } }
+): Promise<string | null> {
+  try {
+    const p = await (context as any)?.params;
+    if (p?.id) return p.id as string;
+  } catch {}
+  try {
+    const url = new URL(req.url);
+    const segs = url.pathname.split('/').filter(Boolean);
+    return (segs[segs.length - 1] as string) || null;
+  } catch {
+    return null;
+  }
+}
+
 // GET /api/notes/[id]
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, context: { params: Promise<{ id: string }> }) {
   noStore(); // prevent caching/static optimization
 
   try {
-    const id = params.id;
+    const id = await resolveId(req, context);
+    if (!id) {
+      return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+    }
     const rows = db.select().from(notes).where(eq(notes.id, id)).all(); // sync (better-sqlite3)
     const row = rows[0];
     if (!row) {
@@ -48,7 +70,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 }
 
 // PUT /api/notes/[id]
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
   noStore(); // prevent caching/static optimization
 
   try {
@@ -59,8 +81,8 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     }
 
     const updates: Record<string, unknown> = {
-      // if your column is integer/timestamp, prefer Date.now()
-      updatedAt: Date.now(),
+      // align with TEXT column type
+      updatedAt: new Date().toISOString(),
     };
 
     if (typeof parsed.data.title === 'string') {
@@ -70,7 +92,10 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
       updates.contentJson = JSON.stringify(parsed.data.contentJson);
     }
 
-    const id = params.id;
+    const id = await resolveId(req, context);
+    if (!id) {
+      return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+    }
 
     // Enforce ownership here if you have auth:
     // const session = await getServerSession();
@@ -82,5 +107,28 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: 'Failed to update note' }, { status: 500 });
+  }
+}
+
+// DELETE /api/notes/[id]
+export async function DELETE(req: Request, context: { params: Promise<{ id: string }> }) {
+  noStore();
+
+  try {
+    const id = await resolveId(req, context);
+    if (!id) {
+      return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+    }
+
+    const rows = db.select().from(notes).where(eq(notes.id, id)).all();
+    if (!rows[0]) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    db.delete(notes).where(eq(notes.id, id)).run();
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ error: 'Failed to delete note' }, { status: 500 });
   }
 }

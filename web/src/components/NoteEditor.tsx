@@ -9,7 +9,7 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 const emptyDoc: JSONContent = { type: 'doc', content: [{ type: 'paragraph' }] };
 
-export default function NoteEditor() {
+export default function NoteEditor({ noteId: noteIdProp }: { noteId?: string | null } = {}) {
   const [noteId, setNoteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState<SaveState>('idle');
@@ -39,9 +39,33 @@ export default function NoteEditor() {
   });
   
 
+  // If a noteId is provided via props, load that note and skip auto-create logic
   useEffect(() => {
-    // Load existing note or create a new one
+    const loadFromProp = async () => {
+      if (!editor) return;
+      if (!noteIdProp) return;
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/notes/${noteIdProp}`);
+        if (!res.ok) throw new Error('Failed to load note');
+        const data = await res.json();
+        setNoteId(data.id);
+        localStorage.setItem('lastNoteId', data.id);
+        editor.commands.setContent(data.contentJson ?? emptyDoc, { emitUpdate: false });
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    void loadFromProp();
+  }, [editor, noteIdProp]);
+
+  // If no prop is provided, keep existing behavior: load last or create new
+  useEffect(() => {
     const init = async () => {
+      if (!editor) return;
+      if (noteIdProp) return; // controlled externally
       try {
         let id = localStorage.getItem('lastNoteId');
         if (id) {
@@ -50,7 +74,7 @@ export default function NoteEditor() {
             const data = await res.json();
             setNoteId(data.id);
             localStorage.setItem('lastNoteId', data.id);
-            editor?.commands.setContent(data.contentJson ?? emptyDoc, { emitUpdate: false });
+            editor.commands.setContent(data.contentJson ?? emptyDoc, { emitUpdate: false });
           } else {
             id = null; // fallback to create
           }
@@ -61,7 +85,7 @@ export default function NoteEditor() {
           const data = await res.json();
           setNoteId(data.id);
           localStorage.setItem('lastNoteId', data.id);
-          editor?.commands.setContent(emptyDoc, { emitUpdate: false });
+          editor.commands.setContent(emptyDoc, { emitUpdate: false });
         }
       } catch (e) {
         console.error(e);
@@ -69,8 +93,8 @@ export default function NoteEditor() {
         setLoading(false);
       }
     };
-    init();
-  }, [editor]);
+    void init();
+  }, [editor, noteIdProp]);
 
   // Cleanup pending debounce timer on unmount
   useEffect(() => {
