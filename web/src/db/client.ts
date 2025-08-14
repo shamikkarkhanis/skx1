@@ -17,6 +17,21 @@ CREATE TABLE IF NOT EXISTS notes (
 );
 `);
 
+// Runtime migration: add embedding/tags columns if they do not exist
+try {
+  const columns = sqlite.prepare("PRAGMA table_info(notes);").all() as Array<{ name: string }>;
+  const hasEmbedding = columns.some((c) => c.name === 'embedding');
+  if (!hasEmbedding) {
+    sqlite.exec("ALTER TABLE notes ADD COLUMN embedding TEXT;");
+  }
+  const hasTags = columns.some((c) => c.name === 'tags');
+  if (!hasTags) {
+    sqlite.exec("ALTER TABLE notes ADD COLUMN tags TEXT;");
+  }
+} catch (e) {
+  console.error('Failed to ensure columns on notes table', e);
+}
+
 export const db = drizzle(sqlite);
 
 export * from './schema';

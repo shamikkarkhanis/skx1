@@ -8,6 +8,10 @@ export const notes = sqliteTable('notes', {
   contentJson: text('content_json').notNull(),
   createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  // JSON stringified embedding vector (number[])
+  embedding: text('embedding'),
+  // JSON stringified array of tags (string[])
+  tags: text('tags'),
 });
 
 export type Note = typeof notes.$inferSelect;

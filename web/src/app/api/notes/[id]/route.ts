@@ -3,6 +3,8 @@ import { unstable_noStore as noStore } from 'next/cache';
 import { db, notes } from '@/db/client';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
+import { buildNoteTextForEmbedding, embedTextWithOllama } from '@/lib/embeddings';
+import { generateTagsFromText } from '@/lib/tags';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -100,6 +102,38 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
     // Enforce ownership here if you have auth:
     // const session = await getServerSession();
     // await assertUserOwnsNote(session.user.id, id);
+
+    // Compute and store embedding and tags (best-effort)
+    try {
+      // Get latest values for title/content to embed
+      let titleForEmbed: string | undefined = typeof parsed.data.title === 'string' ? parsed.data.title : undefined;
+      let contentForEmbed: unknown = parsed.data.contentJson !== undefined ? parsed.data.contentJson : undefined;
+
+      if (titleForEmbed === undefined || contentForEmbed === undefined) {
+        const existing = db.select().from(notes).where(eq(notes.id, id)).all()[0];
+        if (existing) {
+          if (titleForEmbed === undefined) titleForEmbed = existing.title;
+          if (contentForEmbed === undefined) contentForEmbed = safeParseJSON(existing.contentJson) ?? {};
+        }
+      }
+
+      const text = buildNoteTextForEmbedding(titleForEmbed, contentForEmbed);
+      if (text && text.length > 0) {
+        const vec = await embedTextWithOllama(text);
+        updates.embedding = JSON.stringify(vec);
+        try {
+          const tags = await generateTagsFromText(text);
+          if (Array.isArray(tags)) {
+            updates.tags = JSON.stringify(tags);
+          }
+        } catch (e) {
+          console.warn('Tag generation failed; proceeding without updating tags', e);
+        }
+      }
+    } catch (e) {
+      // Do not fail the save if embeddings are unavailable
+      console.warn('Embedding/tagging computation failed; proceeding without updating embedding/tags', e);
+    }
 
     db.update(notes).set(updates).where(eq(notes.id, id)).run(); // sync call
 

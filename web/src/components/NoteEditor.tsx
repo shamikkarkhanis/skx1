@@ -116,6 +116,10 @@ export default function NoteEditor({ noteId: noteIdProp }: { noteId?: string | n
       });
       if (!res.ok) throw new Error('Failed');
       setSaveState('saved');
+      try {
+        // Notify listeners (e.g., sidebar) to refresh immediately
+        window.dispatchEvent(new CustomEvent('note-saved', { detail: { id: noteId } }));
+      } catch {}
       // Return to idle after a short delay
       setTimeout(() => setSaveState('idle'), 1000);
     } catch (e) {
