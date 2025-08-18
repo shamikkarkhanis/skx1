@@ -25,37 +25,33 @@ const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:3b-instruct';
 const EXAMPLE_NOTES = [
   {
     id: '6',
-    title: 'Travel Itinerary: Kyoto',
     content:
       'Book Shinkansen tickets from Tokyo to Kyoto for early morning departure to maximize sightseeing time. Main attractions include Fushimi Inari Taisha with its thousands of vermilion torii gates, the peaceful Arashiyama Bamboo Grove, and Kiyomizu-dera temple with panoramic views of the city. Allocate one day for exploring Gion and possibly attending a traditional tea ceremony. Research matcha dessert cafes in Nishiki Market, and check weather forecasts to pack appropriate layers for spring evenings.'
   },
   {
     id: '7',
-    title: 'App Feature Brainstorm: Notes App MVP',
     content:
       'Core features to implement: CRUD API with secure authentication, a rich-text editor that supports markdown and inline images, and an autosave system that minimizes data loss in unstable network conditions. Explore integrating semantic search with local embeddings to improve retrieval accuracy. Add optional tagging with an AI-generated suggestions panel for organizing large note collections. Consider offline mode using IndexedDB for browser storage and syncing to the server when the connection is restored. Investigate end-to-end encryption strategies to ensure user privacy.'
   },
   {
     id: '8',
-    title: 'Cooking Notes: Pasta Night Experiment',
     content:
       'Plan a three-course pasta-themed dinner starting with fresh tagliatelle in a spinach and ricotta filling served as ravioli, paired with a light tomato-basil sauce. Main course: creamy mushroom fettuccine with a touch of white wine reduction and fresh parsley. Side dish: garlic bread made with a no-knead artisan dough recipe, prepared the night before for slow fermentation flavor. Dessert will be a simple affogato with locally roasted espresso. Test homemade pasta sheets using both manual and motorized rollers to compare texture and cooking times.'
   },
   {
     id: '9',
-    title: 'Book Summary & Reflections: Deep Work by Cal Newport',
     content:
       'The central message emphasizes that deep, focused work produces higher-quality outcomes in less time than shallow, distracted effort. Newport recommends scheduling daily “deep work” blocks, free from notifications, social media, and multitasking. Suggested methods include time-blocking, batching similar tasks together, and maintaining a “shutdown ritual” at the end of the workday to prevent mental overflow. My takeaway: applying these techniques could improve productivity during exam preparation, project sprints, and research tasks by fostering a state of flow and reducing decision fatigue.'
   },
   {
     id: '10',
-    title: 'Startup Pitch Outline: Async Team Communication Tool',
     content:
       'Problem: Remote teams often struggle with maintaining context across asynchronous communication channels, leading to misunderstandings and repeated questions. Solution: Develop an AI-powered Slack integration that generates context-rich summaries of active threads, links related discussions, and creates a searchable knowledge base of decisions. Key differentiators: semantic linking between messages, multi-language support for international teams, and optional integrations with project management tools like Trello or Jira. Potential market includes distributed software teams, academic research groups, and online communities that rely on asynchronous workflows.'
   }
 ];
 
-const BASE_PROMPT = `You are a tagging assistant. Extract 3–7 concise, lowercase topic tags from the given text.\nReturn only JSON: {"tags": ["tag1", "tag2", "tag3"]}.`;
+const BASE_PROMPT = `You are a tagging assistant. Extract 3–7 concise, lowercase topic tags from the given text. The topics should be something describing the overall field of the content, not just words in the text. \nReturn only JSON: {"tags": ["tag1", "tag2", "tag3"]}.`;
+const TITLE_PROMPT = `You are a helpful assistant. Generate a concise, descriptive title (max 8 words) for the given text.\nReturn only JSON: {"title": "Your Title"}.`;
 
 async function checkOllama() {
   try {
@@ -94,6 +90,54 @@ function extractJsonObject(text) {
   } catch (_) {
     return null;
   }
+}
+
+async function generateTitle(text) {
+  const prompt = `${TITLE_PROMPT}\n\nText:\n"""\n${text}\n"""`;
+  const body = {
+    model: OLLAMA_MODEL,
+    prompt,
+    stream: false,
+    options: { temperature: 0.3 },
+    format: 'json'
+  };
+
+  const res = await fetch(`${OLLAMA_HOST}/api/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const msg = await res.text().catch(() => '');
+    throw new Error(`Title generation failed: HTTP ${res.status} ${msg}`);
+  }
+
+  const json = await res.json();
+  const raw = json?.response ?? '';
+
+  let parsed = null;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (_) {
+    parsed = extractJsonObject(raw);
+  }
+
+  let title = '';
+  if (parsed && typeof parsed.title === 'string') {
+    title = parsed.title.trim();
+  }
+
+  if (!title) {
+    // Fallback: first sentence or first ~8 words
+    const cleaned = (text || '').replace(/\s+/g, ' ').trim();
+    if (cleaned) {
+      const m = cleaned.match(/^(.*?[.!?])\s/);
+      title = (m ? m[1] : cleaned.split(' ').slice(0, 8).join(' ')).trim();
+    }
+  }
+
+  return (title || 'Untitled').slice(0, 80);
 }
 
 async function tagText(text) {
@@ -151,16 +195,17 @@ async function main() {
 
   if (custom) {
     console.log('\nTagging custom text...');
-    const tags = await tagText(custom);
-    console.log(JSON.stringify({ tags }, null, 2));
+    const title = await generateTitle(custom);
+    const tags = await tagText(`${title}\n\n${custom}`);
+    console.log(JSON.stringify({ title, tags }, null, 2));
     return;
   }
 
   console.log('\nTagging example notes corpus...');
   for (const note of EXAMPLE_NOTES) {
-    const text = `${note.title}\n\n${note.content}`;
-    const tags = await tagText(text);
-    console.log(`\n- ${note.title} (id=${note.id})`);
+    const title = await generateTitle(note.content);
+    const tags = await tagText(`${title}\n\n${note.content}`);
+    console.log(`\n- ${title} (id=${note.id})`);
     console.log(JSON.stringify({ tags }, null, 2));
   }
 }

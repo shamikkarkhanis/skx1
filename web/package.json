@@ -12,8 +12,11 @@
   },
   "dependencies": {
     "@tiptap/extension-placeholder": "^3.1.0",
+    "@tiptap/extension-task-item": "^3.2.0",
+    "@tiptap/extension-task-list": "^3.2.0",
     "@tiptap/react": "^3.1.0",
     "@tiptap/starter-kit": "^3.1.0",
+    "@tiptap/suggestion": "^3.2.0",
     "better-sqlite3": "^12.2.0",
     "drizzle-orm": "^0.44.4",
     "next": "15.4.6",
@@ -24,14 +27,14 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^7.6.9",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/better-sqlite3": "^7.6.9",
+    "drizzle-kit": "^0.28.0",
     "eslint": "^9",
     "eslint-config-next": "15.4.6",
     "tailwindcss": "^4",
-    "drizzle-kit": "^0.28.0",
     "typescript": "^5"
   }
 }

@@ -3,8 +3,9 @@ import { unstable_noStore as noStore } from 'next/cache';
 import { db, notes } from '@/db/client';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { buildNoteTextForEmbedding, embedTextWithOllama } from '@/lib/embeddings';
+import { buildNoteTextForEmbedding, embedTextWithOllama, extractPlainTextFromTiptap } from '@/lib/embeddings';
 import { generateTagsFromText } from '@/lib/tags';
+import { generateTitleFromText } from '@/lib/title';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,6 +23,14 @@ function safeParseJSON(input: string | null | undefined) {
   } catch {
     return null;
   }
+}
+
+function deriveTitleFromPlainText(text: string): string {
+  const firstLine = text
+    .split('\n')
+    .map((s) => s.trim())
+    .find(Boolean) ?? '';
+  return firstLine.slice(0, 120);
 }
 
 
@@ -87,13 +96,6 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
       updatedAt: new Date().toISOString(),
     };
 
-    if (typeof parsed.data.title === 'string') {
-      updates.title = parsed.data.title;
-    }
-    if (parsed.data.contentJson !== undefined) {
-      updates.contentJson = JSON.stringify(parsed.data.contentJson);
-    }
-
     const id = await resolveId(req, context);
     if (!id) {
       return NextResponse.json({ error: 'Missing id' }, { status: 400 });
@@ -103,19 +105,42 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
     // const session = await getServerSession();
     // await assertUserOwnsNote(session.user.id, id);
 
-    // Compute and store embedding and tags (best-effort)
-    try {
-      // Get latest values for title/content to embed
-      let titleForEmbed: string | undefined = typeof parsed.data.title === 'string' ? parsed.data.title : undefined;
-      let contentForEmbed: unknown = parsed.data.contentJson !== undefined ? parsed.data.contentJson : undefined;
+    // Fetch existing to have a single source of truth for title/content
+    const existing = db.select().from(notes).where(eq(notes.id, id)).all()[0];
 
-      if (titleForEmbed === undefined || contentForEmbed === undefined) {
-        const existing = db.select().from(notes).where(eq(notes.id, id)).all()[0];
-        if (existing) {
-          if (titleForEmbed === undefined) titleForEmbed = existing.title;
-          if (contentForEmbed === undefined) contentForEmbed = safeParseJSON(existing.contentJson) ?? {};
+    // Apply incoming content update (if any)
+    if (parsed.data.contentJson !== undefined) {
+      updates.contentJson = JSON.stringify(parsed.data.contentJson);
+    }
+
+    // Always use AI-generated title from content; on failure, fall back to raw text title
+    const contentForTitle: unknown = parsed.data.contentJson !== undefined
+      ? parsed.data.contentJson
+      : (existing ? safeParseJSON(existing.contentJson) ?? {} : {});
+    try {
+      const plain = extractPlainTextFromTiptap(contentForTitle);
+      if (!plain) {
+        updates.title = '';
+      } else {
+        try {
+          const autoTitle = await generateTitleFromText(plain);
+          updates.title = autoTitle && autoTitle.trim().length > 0 ? autoTitle.trim() : deriveTitleFromPlainText(plain);
+        } catch {
+          updates.title = deriveTitleFromPlainText(plain);
         }
       }
+    } catch {
+      // If even plain extraction fails, leave as empty string
+      updates.title = '';
+    }
+
+    // Compute and store embedding and tags (best-effort)
+    try {
+      // Get latest values for title/content to embed (prefer updates)
+      let titleForEmbed: string | undefined = (updates.title as string | undefined) ?? existing?.title;
+      let contentForEmbed: unknown = parsed.data.contentJson !== undefined
+        ? parsed.data.contentJson
+        : (existing ? safeParseJSON(existing.contentJson) ?? {} : {});
 
       const text = buildNoteTextForEmbedding(titleForEmbed, contentForEmbed);
       if (text && text.length > 0) {

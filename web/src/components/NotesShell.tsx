@@ -5,7 +5,7 @@ import NoteEditor from "@/components/NoteEditor";
 
 type NoteListItem = {
   id: string;
-  title: string;
+  title: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;
   tags?: string[];
