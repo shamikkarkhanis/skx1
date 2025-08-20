@@ -5,7 +5,8 @@ import { randomUUID } from 'crypto';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const emptyDoc = { type: 'doc', content: [{ type: 'paragraph' }] };
+// BlockNote stores the document as an array of block objects
+const emptyDoc: unknown[] = [];
 
 // GET /api/notes -> list notes (no auth yet, returns all)
 export async function GET() {
