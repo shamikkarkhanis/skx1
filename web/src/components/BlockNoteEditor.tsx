@@ -101,7 +101,7 @@ export default function BlockNoteEditor({ noteId }: { noteId?: string | null }) 
       <div className="mb-2 text-sm text-gray-500 flex items-center gap-2">
         <SaveBadge state={saveState} />
       </div>
-      <div className="rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-black p-2">
+      <div className="rounded-lg border border-white/10 bg-black text-white p-2 bn-dark">
         <BlockNoteView editor={editor} onChange={handleChange} />
         {loading ? (
           <div className="mt-2 text-xs text-gray-500">Loading…</div>

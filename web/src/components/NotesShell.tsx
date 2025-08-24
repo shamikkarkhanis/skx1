@@ -139,6 +139,13 @@ export default function NotesShell() {
             className="flex-1 px-2 py-1 text-sm border border-black/10 dark:border-white/10 rounded bg-white dark:bg-black focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
           <button
+            onClick={createNewNote}
+            className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+            title="Create a new note"
+          >
+            New
+          </button>
+          <button
             onClick={deleteSelectedNote}
             disabled={!selectedId}
             className="px-2 py-1 text-xs bg-red-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-red-600"
