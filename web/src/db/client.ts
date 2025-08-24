@@ -15,6 +15,14 @@ CREATE TABLE IF NOT EXISTS notes (
   created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
   updated_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
 );
+CREATE TABLE IF NOT EXISTS note_chunks (
+  id TEXT PRIMARY KEY,
+  note_id TEXT NOT NULL,
+  ord TEXT NOT NULL,
+  text TEXT NOT NULL,
+  embedding TEXT,
+  created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+);
 `);
 
 // Runtime migration: add embedding/tags columns if they do not exist
@@ -28,6 +36,21 @@ try {
   if (!hasTags) {
     sqlite.exec("ALTER TABLE notes ADD COLUMN tags TEXT;");
   }
+  const hasEntities = columns.some((c) => c.name === 'entities');
+  if (!hasEntities) {
+    sqlite.exec("ALTER TABLE notes ADD COLUMN entities TEXT;");
+  }
+  // Ensure note_chunks table columns exist (basic shape); if table existed previously, do nothing
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS note_chunks (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL,
+      ord TEXT NOT NULL,
+      text TEXT NOT NULL,
+      embedding TEXT,
+      created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+    );
+  `);
 } catch (e) {
   console.error('Failed to ensure columns on notes table', e);
 }
