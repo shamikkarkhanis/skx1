@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 const BlockNoteEditor = dynamic(() => import("@/components/BlockNoteEditor"), { ssr: false });
-import EntitiesPanel from "@/components/EntitiesPanel";
+// Entities feature paused: panel import removed
 
 type NoteListItem = {
   id: string;
@@ -28,6 +28,9 @@ export default function NotesShell() {
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null);
   const [isClient, setIsClient] = useState(false);
+  // Entities feature paused: local state removed
+
+  // Entities feature paused
 
   // Prevent hydration errors by ensuring client-side rendering
   useEffect(() => {
@@ -37,19 +40,35 @@ export default function NotesShell() {
   useEffect(() => {
     void refreshList();
     setLoading(false);
-    // Periodically refresh list to reflect updated timestamps
-    const t = setInterval(() => {
-      void refreshList();
-    }, 10000);
-    // Refresh immediately after a save completes in the editor
+    // Refresh after autosave completes
     const onSaved = () => {
+      // Entities feature paused: only refresh list
       void refreshList();
     };
     if (typeof window !== 'undefined') {
       window.addEventListener('note-saved', onSaved as EventListener);
     }
-    return () => clearInterval(t);
-  }, []);
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('note-saved', onSaved as EventListener);
+      }
+    };
+  }, [selectedId]);
+
+  // Subscribe to SSE events for the selected note and refresh list on 'processed'
+  useEffect(() => {
+    if (!selectedId) return;
+    const es = new EventSource(`/api/notes/${selectedId}/events`);
+    const onProcessed = () => {
+      // Entities feature paused: only refresh list (tags update)
+      void refreshList();
+    };
+    es.addEventListener('processed', onProcessed as EventListener);
+    return () => {
+      try { es.removeEventListener('processed', onProcessed as EventListener); } catch {}
+      try { es.close(); } catch {}
+    };
+  }, [selectedId]);
 
   // Debounced semantic search
   useEffect(() => {
@@ -95,6 +114,10 @@ export default function NotesShell() {
       console.error(e);
     }
   }
+
+  // Entities feature paused: fetch for entities removed
+
+  // Entities feature paused: no per-note entities fetch on selection
 
   async function deleteSelectedNote() {
     if (!selectedId) return;
@@ -226,10 +249,10 @@ export default function NotesShell() {
         </div>
       </aside>
       <main className="flex-1 p-6 flex">
-        <div className="max-w-3xl w-full pr-4">
+        <div className="max-w-3xl w-full">
           <BlockNoteEditor noteId={selectedId} />
         </div>
-        <EntitiesPanel noteId={selectedId} />
+        {/* Entities feature paused: panel hidden */}
       </main>
     </div>
   );

@@ -9,6 +9,7 @@ import { generateTitleFromText } from '@/lib/title';
 import { chunkText } from '@/lib/chunking';
 import { generateEntitiesFromText, aggregateEntities } from '@/lib/entities';
 import { randomUUID } from 'crypto';
+import { getNoteEmitter } from '@/lib/noteEvents';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -91,6 +92,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       entities: parseEntities((row as any).entities),
+      tags: Array.isArray(safeParseJSON((row as any).tags)) ? (safeParseJSON((row as any).tags) as string[]) : [],
     });
   } catch (e) {
     console.error(e);
@@ -255,6 +257,11 @@ async function processNoteHeavyWork(id: string) {
     console.error('Error processing note heavy work', e);
   } finally {
     try { console.log(`[bg] done processing note ${id}`); } catch {}
+    try {
+      // notify listeners that processing (embeddings/tags/entities) has completed
+      const em = getNoteEmitter(id);
+      em.emit('processed', { id });
+    } catch {}
   }
 }
 
