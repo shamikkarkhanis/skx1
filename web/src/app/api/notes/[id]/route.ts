@@ -36,6 +36,20 @@ function deriveTitleFromPlainText(text: string): string {
   return firstLine.slice(0, 120);
 }
 
+function parseEntities(raw: string | null | undefined): Array<{ entity: string; weight?: number }> {
+  const arr = safeParseJSON(raw);
+  if (!Array.isArray(arr)) return [];
+  const out: Array<{ entity: string; weight?: number }> = [];
+  for (const it of arr) {
+    if (!it) continue;
+    const entity = typeof it.entity === 'string' ? it.entity : (typeof it.name === 'string' ? it.name : '');
+    if (!entity) continue;
+    const weight = Number(it.weight);
+    out.push({ entity, weight: Number.isFinite(weight) ? weight : undefined });
+  }
+  return out;
+}
+
 
 // Resolve `id` defensively: prefer awaited context.params, fall back to URL parsing
 async function resolveId(
@@ -76,6 +90,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       contentJson: safeParseJSON(row.contentJson) ?? {},
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      entities: parseEntities((row as any).entities),
     });
   } catch (e) {
     console.error(e);

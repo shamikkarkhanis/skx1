@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 const BlockNoteEditor = dynamic(() => import("@/components/BlockNoteEditor"), { ssr: false });
+import EntitiesPanel from "@/components/EntitiesPanel";
 
 type NoteListItem = {
   id: string;
@@ -224,10 +225,11 @@ export default function NotesShell() {
           })()}
         </div>
       </aside>
-      <main className="flex-1 p-6">
-        <div className="max-w-3xl">
+      <main className="flex-1 p-6 flex">
+        <div className="max-w-3xl w-full pr-4">
           <BlockNoteEditor noteId={selectedId} />
         </div>
+        <EntitiesPanel noteId={selectedId} />
       </main>
     </div>
   );

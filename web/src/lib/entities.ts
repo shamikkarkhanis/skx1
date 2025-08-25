@@ -66,8 +66,10 @@ function extractJsonObject(text: string): any | null {
 // Extract entities with rough weights from text using an instruction-tuned model
 export async function generateEntitiesFromText(text: string): Promise<Entity[]> {
   const prompt = `Extract named entities, key concepts, and proper nouns with a small importance weight (1-3).
-Return JSON only in the format: {"entities":[{"entity":"...","weight":1}, ...]}
-Rules: lowercase, hyphenate spaces/underscores, no punctuation except hyphens.`;
+  Return JSON only in the format: {"entities":[{"entity":"...","weight":1}, ...]}
+  Rules:
+  - lowercase, hyphenate spaces/underscores, no punctuation except hyphens
+  - DO NOT include dates, times, plain numbers, or generic headings (e.g., "key-concepts", "note-title", "date")`;  
   const body = {
     model: OLLAMA_TAGGER_MODEL,
     prompt: `${prompt}\n\nText:\n"""\n${text}\n"""`,
