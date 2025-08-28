@@ -110,6 +110,29 @@ body {
   border-color: rgba(255, 255, 255, 0.15) !important;
 }
 
+/* === BlockNote heading size tweaks === */
+/* Reduce overly large default H1/H2 sizes inside the editor */
+.bn-dark .ProseMirror h1 {
+  font-size: 1.5rem !important;   /* ~24px */
+  line-height: 1.75rem !important;/* ~28px */
+  margin-top: 1rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.bn-dark .ProseMirror h2 {
+  font-size: 1.25rem !important;  /* ~20px */
+  line-height: 1.6rem !important; /* ~25-26px */
+  margin-top: 0.875rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.bn-dark .ProseMirror h3 {
+  font-size: 1rem !important;  /* ~16px */
+  line-height: 1.5rem !important; /* ~24px */
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
 /* Placeholder styling within editor input area */
 .bn-dark .mantine-Input-input::placeholder,
 .bn-dark .mantine-TextInput-input::placeholder,

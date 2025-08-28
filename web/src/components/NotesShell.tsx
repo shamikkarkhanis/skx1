@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 const BlockNoteEditor = dynamic(() => import("@/components/BlockNoteEditor"), { ssr: false });
-// Entities feature paused: panel import removed
 
 type NoteListItem = {
   id: string;
@@ -28,9 +27,34 @@ export default function NotesShell() {
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null);
   const [isClient, setIsClient] = useState(false);
-  // Entities feature paused: local state removed
+  // Entities state
+  const [entities, setEntities] = useState<Array<{ entity: string; weight?: number }> | null>(null);
+  const [entitiesLoading, setEntitiesLoading] = useState<boolean>(false);
+  const [entitiesError, setEntitiesError] = useState<string | null>(null);
 
-  // Entities feature paused
+  // Fetch entities for a note
+  async function fetchEntities(noteId: string | null) {
+    if (!noteId) {
+      setEntities(null);
+      setEntitiesLoading(false);
+      setEntitiesError(null);
+      return;
+    }
+    setEntitiesLoading(true);
+    setEntitiesError(null);
+    try {
+      const res = await fetch(`/api/notes/${noteId}`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to fetch note entities");
+      const data = await res.json();
+      const list = Array.isArray(data?.entities) ? data.entities as Array<{ entity: string; weight?: number }> : [];
+      setEntities(list);
+    } catch (e) {
+      console.error(e);
+      setEntitiesError((e as Error).message || "Failed to load entities");
+    } finally {
+      setEntitiesLoading(false);
+    }
+  }
 
   // Prevent hydration errors by ensuring client-side rendering
   useEffect(() => {
@@ -42,8 +66,8 @@ export default function NotesShell() {
     setLoading(false);
     // Refresh after autosave completes
     const onSaved = () => {
-      // Entities feature paused: only refresh list
       void refreshList();
+      void fetchEntities(selectedId);
     };
     if (typeof window !== 'undefined') {
       window.addEventListener('note-saved', onSaved as EventListener);
@@ -60,8 +84,8 @@ export default function NotesShell() {
     if (!selectedId) return;
     const es = new EventSource(`/api/notes/${selectedId}/events`);
     const onProcessed = () => {
-      // Entities feature paused: only refresh list (tags update)
       void refreshList();
+      void fetchEntities(selectedId);
     };
     es.addEventListener('processed', onProcessed as EventListener);
     return () => {
@@ -115,9 +139,12 @@ export default function NotesShell() {
     }
   }
 
-  // Entities feature paused: fetch for entities removed
+  // Fetch entities when selection changes
+  useEffect(() => {
+    void fetchEntities(selectedId);
+  }, [selectedId]);
 
-  // Entities feature paused: no per-note entities fetch on selection
+  // no-op
 
   async function deleteSelectedNote() {
     if (!selectedId) return;
@@ -248,11 +275,50 @@ export default function NotesShell() {
           })()}
         </div>
       </aside>
-      <main className="flex-1 p-6 flex">
+      <main className="relative flex-1 p-6 flex">
         <div className="max-w-3xl w-full">
           <BlockNoteEditor noteId={selectedId} />
         </div>
-        {/* Entities feature paused: panel hidden */}
+        {/* Entities bubbles overlay (top-right) */}
+        <div className="pointer-events-none absolute top-4 right-4 max-w-sm">
+          {(() => {
+            if (!selectedId) return null;
+            if (entitiesError) {
+              return (
+                <div className="pointer-events-auto text-[10px] px-2 py-1 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                  {entitiesError}
+                </div>
+              );
+            }
+            if (entitiesLoading) {
+              return (
+                <div className="flex flex-wrap gap-1 justify-end">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <span key={i} className="h-5 w-14 rounded-full bg-white/10 animate-pulse" />
+                  ))}
+                </div>
+              );
+            }
+            const list = Array.isArray(entities) ? [...entities].sort((a,b)=> (b.weight ?? 0) - (a.weight ?? 0)).slice(0, 14) : [];
+            if (list.length === 0) return null;
+            return (
+              <div className="flex flex-wrap gap-1 justify-end">
+                {list.map((e, i) => (
+                  <span
+                    key={`${e.entity}-${i}`}
+                    title={typeof e.weight === 'number' ? `${e.entity} (${e.weight.toFixed(2)})` : e.entity}
+                    className="pointer-events-auto select-none inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-full bg-white/8 text-gray-200 border border-white/15 backdrop-blur-sm"
+                  >
+                    {e.entity}
+                    {typeof e.weight === 'number' ? (
+                      <span className="opacity-70">{e.weight.toFixed(1)}</span>
+                    ) : null}
+                  </span>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
       </main>
     </div>
   );
