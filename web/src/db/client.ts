@@ -23,6 +23,12 @@ CREATE TABLE IF NOT EXISTS note_chunks (
   embedding TEXT,
   created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
 );
+CREATE TABLE IF NOT EXISTS spaces (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+  updated_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+);
 `);
 
 // Runtime migration: add embedding/tags columns if they do not exist
@@ -39,6 +45,14 @@ try {
   const hasEntities = columns.some((c) => c.name === 'entities');
   if (!hasEntities) {
     sqlite.exec("ALTER TABLE notes ADD COLUMN entities TEXT;");
+  }
+  const hasFolder = columns.some((c) => c.name === 'folder');
+  if (!hasFolder) {
+    sqlite.exec("ALTER TABLE notes ADD COLUMN folder TEXT;");
+  }
+  const hasSpaceId = columns.some((c) => c.name === 'space_id');
+  if (!hasSpaceId) {
+    sqlite.exec("ALTER TABLE notes ADD COLUMN space_id TEXT;");
   }
   // Ensure note_chunks table columns exist (basic shape); if table existed previously, do nothing
   sqlite.exec(`
