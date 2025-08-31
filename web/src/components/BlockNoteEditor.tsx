@@ -19,6 +19,8 @@ export default function BlockNoteEditor({ noteId }: { noteId?: string | null }) 
   const [spaceId, setSpaceId] = useState<string | null>(null);
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [showSpacePicker, setShowSpacePicker] = useState(false);
+  const [tags, setTags] = useState<string[]>([]);
+  const [search, setSearch] = useState('');
 
   // Debounced autosave on editor changes
   const handleChange = () => {
@@ -48,6 +50,11 @@ export default function BlockNoteEditor({ noteId }: { noteId?: string | null }) 
         const cj = data.contentJson;
         // metadata: spaceId
         setSpaceId(typeof data?.spaceId === 'string' ? data.spaceId as string : null);
+        // metadata: tags for "create space from tag"
+        try {
+          const arr = Array.isArray(data?.tags) ? (data.tags as string[]) : [];
+          setTags(arr.filter((x) => typeof x === 'string' && x.trim().length > 0));
+        } catch {}
         // Replace the whole document if we received BlockNote block objects
         // We expect cj to be an array of blocks or a TipTap-like doc. If it's not blocks, start empty.
         if (Array.isArray(cj)) {
@@ -127,6 +134,24 @@ export default function BlockNoteEditor({ noteId }: { noteId?: string | null }) 
     }
   }
 
+  async function createSpaceFromTag(name: string) {
+    const name_processed = (name || '').trim();
+    if (!name_processed) return;
+    try {
+      const res = await fetch('/api/spaces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name_processed }),
+      });
+      if (!res.ok) throw new Error('Failed to create space');
+      const created = (await res.json()) as { id: string; name: string };
+      setSpaces((prev) => [{ id: created.id, name: created.name }, ...prev]);
+      await assignSpace(created.id);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   // Cleanup
   useEffect(() => {
     return () => {
@@ -163,22 +188,45 @@ export default function BlockNoteEditor({ noteId }: { noteId?: string | null }) 
             </button>
             {showSpacePicker ? (
               <div className="absolute z-10 mt-1 w-56 rounded border border-black/10 dark:border-white/10 bg-white dark:bg-black shadow-lg">
-                <ul className="max-h-64 overflow-auto text-sm">
-                  {spaces.length === 0 ? (
-                    <li className="px-2 py-2 text-xs text-gray-500">No spaces</li>
-                  ) : (
-                    spaces.map((s) => (
-                      <li key={s.id}>
+                <div className="max-h-72 overflow-auto text-sm">
+                  <ul>
+                    {spaces.length === 0 ? (
+                      <li className="px-2 py-2 text-xs text-gray-500">No spaces</li>
+                    ) : (
+                      spaces.map((s) => (
+                        <li key={s.id}>
+                          <button
+                            className="w-full text-left px-2 py-1 hover:bg-black/5 dark:hover:bg-white/10"
+                            onClick={() => assignSpace(s.id)}
+                          >
+                            {s.name}
+                          </button>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                  {tags.length > 0 ? (
+                    <>
+                      <div className="my-1 mx-2 h-px bg-black/10 dark:bg-white/10" />
+                      <div className="px-2 py-1 text-[10px] uppercase tracking-wider opacity-60">Create space</div>
+                      <div className="px-2 py-1 flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="New Space"
+                          className="w-full px-2 py-1 border border-black/10 dark:border-white/10 rounded"
+                          onChange={(e) => setSearch(e.target.value)}
+                        />
                         <button
-                          className="w-full text-left px-2 py-1 hover:bg-black/5 dark:hover:bg-white/10"
-                          onClick={() => assignSpace(s.id)}
+                          type="button"
+                          className="w-full px-2 py-1 border border-black/10 dark:border-white/10 rounded"
+                          onClick={() => createSpaceFromTag(search)}
                         >
-                          {s.name}
+                          Create
                         </button>
-                      </li>
-                    ))
-                  )}
-                </ul>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
               </div>
             ) : null}
           </div>
