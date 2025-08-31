@@ -10,6 +10,7 @@ type NoteListItem = {
   createdAt?: string | null;
   updatedAt?: string | null;
   tags?: string[];
+  spaceId?: string | null;
 };
 
 type SearchResult = {
@@ -20,7 +21,7 @@ type SearchResult = {
   score: number;
 };
 
-export default function NotesShell() {
+export default function NotesShell({ spaceId }: { spaceId?: string }) {
   const [notes, setNotes] = useState<NoteListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -31,6 +32,8 @@ export default function NotesShell() {
   const [entities, setEntities] = useState<Array<{ entity: string; weight?: number }> | null>(null);
   const [entitiesLoading, setEntitiesLoading] = useState<boolean>(false);
   const [entitiesError, setEntitiesError] = useState<string | null>(null);
+  // Spaces map (id -> { name }) for displaying space pill
+  const [spacesMap, setSpacesMap] = useState<Record<string, { name: string }>>({});
 
   // Fetch entities for a note
   async function fetchEntities(noteId: string | null) {
@@ -64,6 +67,20 @@ export default function NotesShell() {
   useEffect(() => {
     void refreshList();
     setLoading(false);
+    // load spaces map (once)
+    void (async () => {
+      try {
+        const res = await fetch('/api/spaces', { cache: 'no-store' });
+        if (!res.ok) throw new Error('Failed to fetch spaces');
+        const data = (await res.json()) as Array<{ id: string; name: string }>;
+        const m: Record<string, { name: string }> = {};
+        for (const s of data) m[s.id] = { name: s.name };
+        setSpacesMap(m);
+      } catch (e) {
+        // non-fatal
+        console.warn('spaces load failed', e);
+      }
+    })();
     // Refresh after autosave completes
     const onSaved = () => {
       void refreshList();
@@ -77,7 +94,7 @@ export default function NotesShell() {
         window.removeEventListener('note-saved', onSaved as EventListener);
       }
     };
-  }, [selectedId]);
+  }, [selectedId, spaceId]);
 
   // Subscribe to SSE events for the selected note and refresh list on 'processed'
   useEffect(() => {
@@ -125,11 +142,12 @@ export default function NotesShell() {
 
   async function refreshList() {
     try {
-      const res = await fetch("/api/notes", { cache: "no-store" });
+      const url = spaceId ? `/api/notes?spaceId=${encodeURIComponent(spaceId)}` : "/api/notes";
+      const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to fetch notes");
       const data: NoteListItem[] = await res.json();
       // Prefer last used note if none selected
-      const last = localStorage.getItem("lastNoteId");
+      const last = spaceId ? null : localStorage.getItem("lastNoteId");
       setNotes(data);
       if (!selectedId) {
         setSelectedId(last || data[0]?.id || null);
@@ -166,10 +184,10 @@ export default function NotesShell() {
 
   async function createNewNote() {
     try {
-      const res = await fetch("/api/notes", { method: "POST" });
+      const res = await fetch("/api/notes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(spaceId ? { spaceId } : {}) });
       if (!res.ok) throw new Error("Failed to create note");
       const { id } = await res.json();
-      localStorage.setItem("lastNoteId", id);
+      if (!spaceId) localStorage.setItem("lastNoteId", id);
       setSelectedId(id);
       // Optimistically add to top; full refresh will reorder as needed
       setNotes((prev) => [{ id, title: "Untitled", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, ...prev]);
@@ -251,22 +269,17 @@ export default function NotesShell() {
                       }`}
                     >
                       <div className="truncate text-sm">{n.title || "Untitled"}</div>
-                      <div className="text-[10px] text-gray-500">
-                        {n.updatedAt ? new Date(n.updatedAt).toLocaleString() : ""}
+                      <div className="flex items-center gap-2 text-[10px] text-gray-500 mt-0.5">
+                        <span>{n.updatedAt ? new Date(n.updatedAt).toLocaleString() : ""}</span>
+                        {n.spaceId ? (
+                          <span
+                            className="px-1.5 py-0.5 rounded-full border border-black/10 dark:border-white/10 text-gray-700 dark:text-gray-200 bg-black/5 dark:bg-white/5"
+                            title={spacesMap[n.spaceId]?.name || n.spaceId}
+                          >
+                            {spacesMap[n.spaceId]?.name || n.spaceId}
+                          </span>
+                        ) : null}
                       </div>
-                      {Array.isArray(n.tags) && n.tags.length > 0 ? (
-                        <div className="mt-0.5 flex flex-wrap gap-1">
-                          {n.tags.slice(0, 7).map((t, i) => (
-                            <span
-                              key={`${n.id}-tag-${i}`}
-                              className="text-[10px] px-1.5 py-0.5 rounded border border-black/10 dark:border-white/10 text-gray-600 dark:text-gray-300"
-                              title={t}
-                            >
-                              {t}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
                     </button>
                   </li>
                 ))}

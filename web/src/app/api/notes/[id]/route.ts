@@ -18,6 +18,8 @@ export const revalidate = 0;
 const UpdateSchema = z.object({
   title: z.string().optional(),
   contentJson: z.unknown().optional(),
+  folder: z.union([z.string(), z.null()]).optional(),
+  spaceId: z.union([z.string(), z.null()]).optional(),
 });
 
 function safeParseJSON(input: string | null | undefined) {
@@ -50,7 +52,6 @@ function parseEntities(raw: string | null | undefined): Array<{ entity: string; 
   }
   return out;
 }
-
 
 // Resolve `id` defensively: prefer awaited context.params, fall back to URL parsing
 async function resolveId(
@@ -92,6 +93,8 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       entities: parseEntities((row as any).entities),
+      folder: (row as any).folder ?? null,
+      spaceId: (row as any).spaceId ?? null,
       tags: Array.isArray(safeParseJSON((row as any).tags)) ? (safeParseJSON((row as any).tags) as string[]) : [],
     });
   } catch (e) {
@@ -154,7 +157,21 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
       updates.title = '';
     }
 
-    // Persist minimal updates first (content + title)
+    // Optional folder update (manual naming)
+    if (parsed.data.folder !== undefined) {
+      const raw = parsed.data.folder;
+      const next = (typeof raw === 'string' ? raw.trim() : null) || null;
+      (updates as any).folder = next;
+    }
+
+    // Optional spaceId update
+    if (parsed.data.spaceId !== undefined) {
+      const raw = parsed.data.spaceId;
+      const next = (typeof raw === 'string' ? raw.trim() : null) || null;
+      (updates as any).spaceId = next;
+    }
+
+    // Persist minimal updates first (content + title + folder + spaceId)
     db.update(notes).set(updates).where(eq(notes.id, id)).run(); // sync call
 
     // Fire-and-forget heavy processing: embeddings, tags, chunk embeddings, entities

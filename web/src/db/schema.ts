@@ -14,6 +14,10 @@ export const notes = sqliteTable('notes', {
   tags: text('tags'),
   // JSON stringified array of entities with weights: [{entity, weight}]
   entities: text('entities'),
+  // Optional manual folder name (UI grouping)
+  folder: text('folder'),
+  // Optional foreign key to a space
+  spaceId: text('space_id'),
 });
 
 export type Note = typeof notes.$inferSelect;
@@ -31,3 +35,15 @@ export const noteChunks = sqliteTable('note_chunks', {
 
 export type NoteChunk = typeof noteChunks.$inferSelect;
 export type NewNoteChunk = typeof noteChunks.$inferInsert;
+
+// Spaces table: groups of notes
+export const spaces = sqliteTable('spaces', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export type Space = typeof spaces.$inferSelect;
+export type NewSpace = typeof spaces.$inferInsert;
+
