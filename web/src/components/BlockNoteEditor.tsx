@@ -21,6 +21,14 @@ export default function BlockNoteEditor({ noteId }: { noteId?: string | null }) 
   const [showSpacePicker, setShowSpacePicker] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [search, setSearch] = useState('');
+  const spaceInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Focus the space input when the picker opens
+  useEffect(() => {
+    if (showSpacePicker) {
+      setTimeout(() => spaceInputRef.current?.focus(), 0);
+    }
+  }, [showSpacePicker]);
 
   // Debounced autosave on editor changes
   const handleChange = () => {
@@ -146,6 +154,7 @@ export default function BlockNoteEditor({ noteId }: { noteId?: string | null }) 
       if (!res.ok) throw new Error('Failed to create space');
       const created = (await res.json()) as { id: string; name: string };
       setSpaces((prev) => [{ id: created.id, name: created.name }, ...prev]);
+      setSearch('');
       await assignSpace(created.id);
     } catch (e) {
       console.error(e);
@@ -205,27 +214,31 @@ export default function BlockNoteEditor({ noteId }: { noteId?: string | null }) 
                       ))
                     )}
                   </ul>
-                  {tags.length > 0 ? (
-                    <>
-                      <div className="my-1 mx-2 h-px bg-black/10 dark:bg-white/10" />
-                      <div className="px-2 py-1 text-[10px] uppercase tracking-wider opacity-60">Create space</div>
-                      <div className="px-2 py-1 flex gap-2">
-                        <input
-                          type="text"
-                          placeholder="New Space"
-                          className="w-full px-2 py-1 border border-black/10 dark:border-white/10 rounded"
-                          onChange={(e) => setSearch(e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          className="w-full px-2 py-1 border border-black/10 dark:border-white/10 rounded"
-                          onClick={() => createSpaceFromTag(search)}
-                        >
-                          Create
-                        </button>
-                      </div>
-                    </>
-                  ) : null}
+                  <div className="my-1 mx-2 h-px bg-black/10 dark:bg-white/10" />
+                  <div className="px-2 py-1 text-[10px] uppercase tracking-wider opacity-60">Create space</div>
+                  <form
+                    className="px-2 py-1 flex gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void createSpaceFromTag(search);
+                    }}
+                  >
+                    <input
+                      ref={spaceInputRef}
+                      type="text"
+                      placeholder="New Space"
+                      className="w-full px-2 py-1 border border-black/10 dark:border-white/10 rounded"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                    <button
+                      type="submit"
+                      className="px-2 py-1 border border-black/10 dark:border-white/10 rounded disabled:opacity-50"
+                      disabled={!search.trim()}
+                    >
+                      Create
+                    </button>
+                  </form>
                 </div>
               </div>
             ) : null}
