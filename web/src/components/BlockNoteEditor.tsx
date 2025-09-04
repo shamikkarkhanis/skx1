@@ -3,7 +3,8 @@
 import "@blocknote/core/fonts/inter.css";
 import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
-import { useCreateBlockNote } from "@blocknote/react";
+import { DefaultReactSuggestionItem, SuggestionMenuController, getDefaultReactSlashMenuItems, useCreateBlockNote } from "@blocknote/react";
+import { filterSuggestionItems } from "@blocknote/core";
 import { useEffect, useRef, useState } from "react";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -246,7 +247,67 @@ export default function BlockNoteEditor({ noteId }: { noteId?: string | null }) 
         )}
       </div>
       <div className="rounded-lg border border-white/10 bg-black text-white p-2 bn-dark">
-        <BlockNoteView editor={editor} onChange={handleChange} />
+        <BlockNoteView editor={editor} onChange={handleChange} slashMenu={false}>
+          {/* Custom Slash Menu with math symbols */}
+          <SuggestionMenuController
+            triggerCharacter="/"
+            getItems={async (query): Promise<DefaultReactSuggestionItem[]> => {
+              const defaults = getDefaultReactSlashMenuItems(editor);
+              const custom: DefaultReactSuggestionItem[] = [
+                // Sets
+                { title: "Union ∪", subtext: "Set union", aliases: ["union","set union","or","u"], group: "Math", onItemClick: () => editor.insertInlineContent("∪ ") },
+                { title: "Intersection ∩", subtext: "Set intersection", aliases: ["intersection","set intersection","and","n"], group: "Math", onItemClick: () => editor.insertInlineContent("∩ ") },
+                { title: "Subset ⊂", subtext: "Proper subset", aliases: ["subset","proper subset"], group: "Math", onItemClick: () => editor.insertInlineContent("⊂ ") },
+                { title: "Subseteq ⊆", subtext: "Subset or equal", aliases: ["subseteq","subset=","subseteq"], group: "Math", onItemClick: () => editor.insertInlineContent("⊆ ") },
+                { title: "Superset ⊃", subtext: "Proper superset", aliases: ["superset","proper superset"], group: "Math", onItemClick: () => editor.insertInlineContent("⊃ ") },
+                { title: "Superseteq ⊇", subtext: "Superset or equal", aliases: ["superseteq","superset=","superset eq"], group: "Math", onItemClick: () => editor.insertInlineContent("⊇ ") },
+                { title: "Element ∈", subtext: "Element of", aliases: ["in","element","in set"], group: "Math", onItemClick: () => editor.insertInlineContent("∈ ") },
+                { title: "Not element ∉", subtext: "Not an element of", aliases: ["notin","not in","not element"], group: "Math", onItemClick: () => editor.insertInlineContent("∉ ") },
+                { title: "Empty ∅", subtext: "Empty set", aliases: ["empty","empty set","null set"], group: "Math", onItemClick: () => editor.insertInlineContent("∅ ") },
+
+                // Logic
+                { title: "For all ∀", subtext: "Universal quantifier", aliases: ["forall","for all"], group: "Math", onItemClick: () => editor.insertInlineContent("∀ ") },
+                { title: "There exists ∃", subtext: "Existential quantifier", aliases: ["exists","there exists"], group: "Math", onItemClick: () => editor.insertInlineContent("∃ ") },
+                { title: "Not ¬", subtext: "Logical not", aliases: ["not","neg","negate"], group: "Math", onItemClick: () => editor.insertInlineContent("¬ ") },
+                { title: "Implies ⇒", subtext: "Implication", aliases: ["implies","=>","impl"], group: "Math", onItemClick: () => editor.insertInlineContent("⇒ ") },
+                { title: "Iff ⇔", subtext: "If and only if", aliases: ["iff","<=>","equiv"], group: "Math", onItemClick: () => editor.insertInlineContent("⇔ ") },
+
+                // Relations
+                { title: "Approximately ≈", subtext: "Approximately equal", aliases: ["approx","approximate"], group: "Math", onItemClick: () => editor.insertInlineContent("≈ ") },
+                { title: "Congruent ≅", subtext: "Congruent", aliases: ["congruent","~=","isomorphic"], group: "Math", onItemClick: () => editor.insertInlineContent("≅ ") },
+                { title: "Proportional ∝", subtext: "Proportional to", aliases: ["proportional","prop"], group: "Math", onItemClick: () => editor.insertInlineContent("∝ ") },
+
+                // Arrows
+                { title: "Arrow →", subtext: "Right arrow", aliases: ["to","arrow","->"], group: "Math", onItemClick: () => editor.insertInlineContent("→ ") },
+                { title: "Arrow ←", subtext: "Left arrow", aliases: ["from","<-"], group: "Math", onItemClick: () => editor.insertInlineContent("← ") },
+                { title: "Maps to ↦", subtext: "Maps to", aliases: ["mapsto","maps to"], group: "Math", onItemClick: () => editor.insertInlineContent("↦ ") },
+
+                // Operators
+                { title: "Plus/minus ±", subtext: "Plus or minus", aliases: ["plusminus","+/-"], group: "Math", onItemClick: () => editor.insertInlineContent("± ") },
+                { title: "Times ×", subtext: "Multiplication sign", aliases: ["times","multiply","*"], group: "Math", onItemClick: () => editor.insertInlineContent("× ") },
+                { title: "Dot ·", subtext: "Dot operator", aliases: ["dot","cdot","center dot"], group: "Math", onItemClick: () => editor.insertInlineContent("· ") },
+                { title: "Degree °", subtext: "Degree", aliases: ["degree","deg"], group: "Math", onItemClick: () => editor.insertInlineContent("° ") },
+                { title: "Infinity ∞", subtext: "Infinity", aliases: ["infinity","inf"], group: "Math", onItemClick: () => editor.insertInlineContent("∞ ") },
+                { title: "Square root √", subtext: "Square root", aliases: ["sqrt","root"], group: "Math", onItemClick: () => editor.insertInlineContent("√ ") },
+
+                // Calculus / Algebra
+                { title: "Integral ∫", subtext: "Integral", aliases: ["integral","int"], group: "Math", onItemClick: () => editor.insertInlineContent("∫ ") },
+                { title: "Summation Σ", subtext: "Summation", aliases: ["sum","sigma"], group: "Math", onItemClick: () => editor.insertInlineContent("Σ ") },
+                { title: "Product ∏", subtext: "Product", aliases: ["prod","pi"], group: "Math", onItemClick: () => editor.insertInlineContent("∏ ") },
+                { title: "Nabla ∇", subtext: "Gradient / Nabla", aliases: ["nabla","grad","del"], group: "Math", onItemClick: () => editor.insertInlineContent("∇ ") },
+
+                // Number sets
+                { title: "Naturals ℕ", subtext: "Set of natural numbers", aliases: ["naturals","N"], group: "Math", onItemClick: () => editor.insertInlineContent("ℕ ") },
+                { title: "Integers ℤ", subtext: "Set of integers", aliases: ["integers","Z"], group: "Math", onItemClick: () => editor.insertInlineContent("ℤ ") },
+                { title: "Rationals ℚ", subtext: "Set of rationals", aliases: ["rationals","Q"], group: "Math", onItemClick: () => editor.insertInlineContent("ℚ ") },
+                { title: "Reals ℝ", subtext: "Set of real numbers", aliases: ["reals","R"], group: "Math", onItemClick: () => editor.insertInlineContent("ℝ ") },
+                { title: "Complex ℂ", subtext: "Set of complex numbers", aliases: ["complex","C"], group: "Math", onItemClick: () => editor.insertInlineContent("ℂ ") },
+              ];
+              // Ensure Math group appears last by ordering defaults before custom
+              return filterSuggestionItems([...defaults, ...custom], query);
+            }}
+          />
+        </BlockNoteView>
         {loading ? (
           <div className="mt-2 text-xs text-gray-500">Loading…</div>
         ) : null}
